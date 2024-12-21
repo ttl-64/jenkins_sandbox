@@ -1,0 +1,2 @@
+ssh_key_dest_dir: /home/jenkins/.ssh
+ssh_pubkey: jenkins_slave_public_key.pub

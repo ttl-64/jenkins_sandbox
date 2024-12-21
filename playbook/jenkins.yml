@@ -1,0 +1,21 @@
+---
+- name: Configure servers for master and one slave of Jenkins
+  hosts: all
+  become: true
+  any_errors_fatal: true
+  roles:
+    - role: master
+      when: "'master' in group_names"
+    - role: slave
+      when: "'slave' in group_names"
+
+  tasks: 
+    - name: Show jenkins password
+      debug:
+        msg: "{{ jenkinsPassword.stdout }}"
+      when: "'master' in group_names and jenkinsPassword is defined"
+    - name: Print public key for jenkins
+      debug:
+        msg: "{{ private_key_output.stdout }}"
+      when: "'master' in group_names and private_key_output is defined"
+...

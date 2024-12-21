@@ -1,0 +1,3 @@
+server_name: localhost
+dock_comp_file: docker-compose.yml
+default_dest_dir: /home/vagrant/

@@ -1,0 +1,59 @@
+- name: check if docker is installed or install it if not
+  include_tasks: "{{ ansible_distribution | lower }}.yml"
+
+- name: add "vagrant" user to "docker" group
+  user:
+    name: vagrant
+    groups: docker
+    append: true
+
+- name: check if docker is active
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: copy project files to default destination dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ default_dest_dir }}{{ item }}"
+  loop:
+    - "{{ dock_comp_file }}"
+
+- name: deploy docker-compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ default_dest_dir }}"
+    files:
+      - docker-compose.yml
+
+- name: generate SSH key for jenkins_slave
+  community.crypto.openssh_keypair:
+    path: "/home/vagrant/.ssh/jenkins_slave"
+    type: rsa
+    size: 2048
+    state: present
+    owner: vagrant
+    group: vagrant
+    force: false
+
+- name: Display public key for jenkins_slave
+  ansible.builtin.command:
+    cmd: "cat /home/vagrant/.ssh/jenkins_slave"
+  register: private_key_output
+
+- name: Write public key to a file on the local machine
+  fetch:
+    src: "/home/vagrant/.ssh/jenkins_slave.pub"
+    dest: "{{ playbook_dir }}/roles/slave/files/jenkins_slave_public_key.pub"
+    flat: yes
+
+- name: Wait until the file with Jenkins password is present before continuing
+  wait_for:
+    path: /root/jenkins_compose/jenkins_configuration/secrets/initialAdminPassword
+    delay: 10
+
+- name: get admin password from docker container with Jenkins-master
+  ansible.builtin.command:
+    cmd: "docker exec jenkins-master cat /var/jenkins_home/secrets/initialAdminPassword"
+  register: jenkinsPassword
+
