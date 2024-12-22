@@ -1,32 +1,45 @@
-- name: check if docker is installed or install it if not
+- name: Check if docker is installed or install it if not
   include_tasks: "{{ ansible_distribution | lower }}.yml"
 
-- name: add "vagrant" user to "docker" group
+- name: Add "vagrant" user to "docker" group
   user:
     name: vagrant
     groups: docker
     append: true
 
-- name: check if docker is active
+- name: Check if docker is active
   service:
     name: docker
     state: started
     enabled: true
 
-- name: copy project files to default destination dir
+- name: Copy project files to default destination dir
   copy:
     src: "{{ item }}"
     dest: "{{ default_dest_dir }}{{ item }}"
   loop:
     - "{{ dock_comp_file }}"
 
-- name: deploy docker-compose stack
+- name: Deploy docker-compose stack
   community.docker.docker_compose_v2:
     project_src: "{{ default_dest_dir }}"
     files:
       - docker-compose.yml
 
-- name: generate SSH key for jenkins_slave
+- name: Ensure correct owner for Jenkins configuration directory
+  file:
+    path: /root/jenkins_compose/jenkins_configuration
+    owner: 1000
+    group: 1000
+    recurse: yes
+
+- name: Ensure correct permissions for Jenkins configuration directory
+  file:
+    path: /root/jenkins_compose/jenkins_configuration
+    mode: '0755'
+    recurse: yes
+    
+- name: Generate SSH key for jenkins_slave
   community.crypto.openssh_keypair:
     path: "/home/vagrant/.ssh/jenkins_slave"
     type: rsa
@@ -37,7 +50,7 @@
     force: false
 
 - name: Display public key for jenkins_slave
-  ansible.builtin.command:
+  command:
     cmd: "cat /home/vagrant/.ssh/jenkins_slave"
   register: private_key_output
 
@@ -51,9 +64,26 @@
   wait_for:
     path: /root/jenkins_compose/jenkins_configuration/secrets/initialAdminPassword
     delay: 10
+    timeout: 40
+  ignore_errors: yes
 
-- name: get admin password from docker container with Jenkins-master
-  ansible.builtin.command:
+- name: Get admin password from docker container with Jenkins-master
+  command:
     cmd: "docker exec jenkins-master cat /var/jenkins_home/secrets/initialAdminPassword"
   register: jenkinsPassword
+  ignore_errors: yes
 
+- name: Copy jenkins-master.service unit to systemd folder
+  copy:
+    src: "{{ playbook_dir }}/roles/master/files/jenkins-master.service"
+    dest: "/etc/systemd/system/jenkins-master.service"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable jenkins-master service and ensure it is not masked
+  systemd_service:
+    name: jenkins-master
+    enabled: true
+    daemon_reload: true
+    masked: no

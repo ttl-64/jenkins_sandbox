@@ -2,7 +2,7 @@
 - name: Configure servers for master and one slave of Jenkins
   hosts: all
   become: true
-  any_errors_fatal: true
+  # any_errors_fatal: true
   roles:
     - role: master
       when: "'master' in group_names"
@@ -12,7 +12,7 @@
   tasks: 
     - name: Show jenkins password
       debug:
-        msg: "{{ jenkinsPassword.stdout }}"
+        msg: "{{ jenkinsPassword.stdout | default('Jenkins admin profile has already been configured', true) }}"
       when: "'master' in group_names and jenkinsPassword is defined"
     - name: Print public key for jenkins
       debug:
